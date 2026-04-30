@@ -144,11 +144,10 @@ if __name__ == "__main__":
 
 ### Basic verification commands
 
-Repository setup from `README.md`:
+For Windows startup verification, use the root startup script so environment creation and dependency synchronization follow the uv-managed command contract below:
 
 ```shell
-pip install -r requirements.txt
-python main.py start -config_center d19f7b0a-2b8a-4503-8c0d-1a587b90eb69
+start_fay.bat
 ```
 
 For code-only changes, at minimum run Python syntax compilation on touched modules when feasible:
@@ -170,8 +169,8 @@ For docs/spec-only changes, no runtime verification command is required beyond r
 
 ```bat
 start_fay.bat
-python -m venv .venv
-.venv\Scripts\python.exe -m pip install -r requirements.txt
+uv venv .venv
+uv pip install --python .venv\Scripts\python.exe -r requirements.txt
 .venv\Scripts\python.exe main.py start -config_center d19f7b0a-2b8a-4503-8c0d-1a587b90eb69
 ```
 
@@ -179,30 +178,34 @@ python -m venv .venv
 
 - Working directory: the script must switch to its own directory with `cd /d "%~dp0"` so double-click launch works.
 - Virtual environment path: `.venv` at the repository root.
-- Python command: use `python` only for venv creation; runtime launch uses `.venv\Scripts\python.exe`.
-- Dependency install: run `.venv\Scripts\python.exe -m pip install -r requirements.txt` before every startup, including when `.venv` already exists, so stale/incomplete environments are synchronized.
+- uv availability: fail clearly with `pause` and exit `1` if `uv` is not installed or is not available on `PATH`.
+- Environment creation: if `.venv\Scripts\python.exe` is missing, create the environment with `uv venv .venv`; do not use `python -m venv`.
+- Dependency synchronization: run `uv pip install --python .venv\Scripts\python.exe -r requirements.txt` before every startup, including when `.venv` already exists, so stale/incomplete environments are synchronized; do not use `.venv\Scripts\python.exe -m pip install`.
+- Runtime launch: use `.venv\Scripts\python.exe` to launch Fay.
 - Runtime config: use the README quick-start `-config_center d19f7b0a-2b8a-4503-8c0d-1a587b90eb69` unless the startup requirement changes.
 
 #### 4. Validation & Error Matrix
 
-- `python -m venv .venv` fails -> print the failure context, `pause`, exit `1`.
-- dependency installation fails -> print the failure context, `pause`, exit `1`.
+- `uv` is unavailable -> print the failure context, `pause`, exit `1`.
+- `uv venv .venv` fails -> print the failure context, `pause`, exit `1`.
+- dependency synchronization fails -> print the failure context, `pause`, exit `1`.
 - Fay startup exits with non-zero status -> print the failure context, `pause`, exit `1`.
 - Fay stops normally with exit code `0` -> exit without pausing.
 
 #### 5. Good/Base/Bad Cases
 
-- Good: double-click `start_fay.bat` from Explorer; it switches to repo root, creates `.venv` if missing, installs dependencies, and launches Fay.
+- Good: double-click `start_fay.bat` from Explorer; it switches to repo root, creates `.venv` with `uv venv .venv` if missing, synchronizes dependencies with `uv pip install --python .venv\Scripts\python.exe -r requirements.txt`, and launches Fay.
 - Base: run `start_fay.bat` from `cmd` with existing `.venv`; it reuses `.venv\Scripts\python.exe`, synchronizes dependencies from `requirements.txt`, and launches Fay.
 - Bad: use global `python main.py ...` from the batch script; this bypasses the project virtual environment and can load incompatible dependencies.
+- Bad: use `python -m venv` or `.venv\Scripts\python.exe -m pip install` for environment management; Windows startup is uv-managed.
 
 #### 6. Tests Required
 
-- Review the batch file for `cd /d "%~dp0"`, `.venv\Scripts\python.exe`, and absence of `python3`.
+- Review the batch file for `cd /d "%~dp0"`, `.venv\Scripts\python.exe`, `uv venv .venv`, `uv pip install --python .venv\Scripts\python.exe -r requirements.txt`, and absence of `python -m venv`, `.venv\Scripts\python.exe -m pip install`, and `python3`.
 - On Windows, run from repo root and verify the command reaches Fay startup.
-- If testing a missing environment, temporarily move/remove `.venv` outside the repo, run the script, and verify dependency installation happens after venv creation.
-- With an existing `.venv`, run the script and verify dependency installation still runs before Fay startup.
-- Verify non-zero setup/startup failures pause before exiting so the error remains visible.
+- If testing a missing environment, temporarily move/remove `.venv` outside the repo, run the script, and verify dependency synchronization happens after uv venv creation.
+- With an existing `.venv`, run the script and verify dependency synchronization still runs before Fay startup.
+- Verify missing `uv` and non-zero setup/startup failures pause before exiting so the error remains visible.
 
 #### 7. Wrong vs Correct
 
@@ -216,8 +219,8 @@ Correct:
 
 ```bat
 cd /d "%~dp0"
-if not exist ".venv\Scripts\python.exe" python -m venv ".venv"
-".venv\Scripts\python.exe" -m pip install -r requirements.txt
+if not exist ".venv\Scripts\python.exe" uv venv ".venv"
+uv pip install --python ".venv\Scripts\python.exe" -r requirements.txt
 ".venv\Scripts\python.exe" main.py start -config_center d19f7b0a-2b8a-4503-8c0d-1a587b90eb69
 ```
 

@@ -6,19 +6,25 @@ cd /d "%~dp0"
 set "VENV_DIR=.venv"
 set "PYTHON_EXE=%VENV_DIR%\Scripts\python.exe"
 
+where uv >nul 2>nul
+if errorlevel 1 (
+    set "FAIL_MESSAGE=uv is not installed or is not available on PATH. Install uv, then run this script again."
+    goto fail
+)
+
 if not exist "%PYTHON_EXE%" (
-    echo Creating Python virtual environment in %VENV_DIR%...
-    python -m venv "%VENV_DIR%"
+    echo Creating uv virtual environment in %VENV_DIR%...
+    uv venv "%VENV_DIR%"
     if errorlevel 1 (
-        set "FAIL_MESSAGE=Failed to create Python virtual environment."
+        set "FAIL_MESSAGE=Failed to create uv virtual environment."
         goto fail
     )
 )
 
-echo Installing dependencies from requirements.txt...
-"%PYTHON_EXE%" -m pip install -r requirements.txt
+echo Synchronizing dependencies from requirements.txt...
+uv pip install --python "%PYTHON_EXE%" -r requirements.txt
 if errorlevel 1 (
-    set "FAIL_MESSAGE=Failed to install dependencies from requirements.txt."
+    set "FAIL_MESSAGE=Failed to synchronize dependencies from requirements.txt."
     goto fail
 )
 
