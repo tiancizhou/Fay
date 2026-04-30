@@ -159,6 +159,68 @@ python -m py_compile path/to/changed_file.py
 
 For docs/spec-only changes, no runtime verification command is required beyond reviewing the modified Markdown.
 
+### Windows startup script command contract
+
+#### 1. Scope / Trigger
+
+- Trigger: root-level Windows startup scripts are user-facing commands and deployment/platform behavior.
+- Scope: `start_fay.bat` launches Fay through a repo-local virtual environment without changing Python application startup code.
+
+#### 2. Signatures
+
+```bat
+start_fay.bat
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe main.py start -config_center d19f7b0a-2b8a-4503-8c0d-1a587b90eb69
+```
+
+#### 3. Contracts
+
+- Working directory: the script must switch to its own directory with `cd /d "%~dp0"` so double-click launch works.
+- Virtual environment path: `.venv` at the repository root.
+- Python command: use `python` only for venv creation; runtime launch uses `.venv\Scripts\python.exe`.
+- Dependency install: run `.venv\Scripts\python.exe -m pip install -r requirements.txt` before every startup, including when `.venv` already exists, so stale/incomplete environments are synchronized.
+- Runtime config: use the README quick-start `-config_center d19f7b0a-2b8a-4503-8c0d-1a587b90eb69` unless the startup requirement changes.
+
+#### 4. Validation & Error Matrix
+
+- `python -m venv .venv` fails -> print the failure context, `pause`, exit `1`.
+- dependency installation fails -> print the failure context, `pause`, exit `1`.
+- Fay startup exits with non-zero status -> print the failure context, `pause`, exit `1`.
+- Fay stops normally with exit code `0` -> exit without pausing.
+
+#### 5. Good/Base/Bad Cases
+
+- Good: double-click `start_fay.bat` from Explorer; it switches to repo root, creates `.venv` if missing, installs dependencies, and launches Fay.
+- Base: run `start_fay.bat` from `cmd` with existing `.venv`; it reuses `.venv\Scripts\python.exe`, synchronizes dependencies from `requirements.txt`, and launches Fay.
+- Bad: use global `python main.py ...` from the batch script; this bypasses the project virtual environment and can load incompatible dependencies.
+
+#### 6. Tests Required
+
+- Review the batch file for `cd /d "%~dp0"`, `.venv\Scripts\python.exe`, and absence of `python3`.
+- On Windows, run from repo root and verify the command reaches Fay startup.
+- If testing a missing environment, temporarily move/remove `.venv` outside the repo, run the script, and verify dependency installation happens after venv creation.
+- With an existing `.venv`, run the script and verify dependency installation still runs before Fay startup.
+- Verify non-zero setup/startup failures pause before exiting so the error remains visible.
+
+#### 7. Wrong vs Correct
+
+Wrong:
+
+```bat
+python main.py start -config_center d19f7b0a-2b8a-4503-8c0d-1a587b90eb69
+```
+
+Correct:
+
+```bat
+cd /d "%~dp0"
+if not exist ".venv\Scripts\python.exe" python -m venv ".venv"
+".venv\Scripts\python.exe" -m pip install -r requirements.txt
+".venv\Scripts\python.exe" main.py start -config_center d19f7b0a-2b8a-4503-8c0d-1a587b90eb69
+```
+
 ---
 
 ## Impact Radius Checklist
